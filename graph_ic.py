@@ -67,81 +67,6 @@ def list_of_atom_symbols(molecule) -> list:
         symbol_list.append(atom.symbol)
     return symbol_list 
 
-
-def draw_graph(graph,molecule):
-    """ 
-    Uses Networkx to make a cool 3D Graph of your grah
-    """
-    # make a dictionary to store the node colors
-    node_colors = []
-    for node in graph.nodes():
-        if graph.degree[node] == 2:
-            node_colors.append("red")
-        elif graph.degree[node] == 3:
-            node_colors.append("lightblue")
-        elif graph.degree[node] == 4:
-            node_colors.append("orange")
-        else:
-            node_colors.append("green")
-    
-    node_labels = {node: f"{node}" for node in graph.nodes()}
-
-    print(graph.nodes())
-    print(molecule)
-    # Extract the positions out of the molecule
-    pos = {}
-    i= 0
-    for atom in molecule:
-        pos[atom.symbol] = atom.coordinates
-        i +=1
-    
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection="3d")
-
-    # This draws the edges
-    for edge in graph.edges():
-        x_vals = [pos[edge[0]][0],pos[edge[1]][0]]
-        y_vals = [pos[edge[0]][1],pos[edge[1]][1]]
-        z_vals = [pos[edge[0]][2],pos[edge[1]][2]]
-        ax.plot(x_vals,y_vals,z_vals,color="black")
-
-   # And we hilight the degrees of the individual nodes
-
-    degree_colors = {1: "red", 2: "green", 3: "orange", 4: "lightblue"}
-
-    degrees = dict(graph.degree())
-
-     
-    # Now draw the nodes
-    x_vals = [pos[node][0] for node in graph.nodes()]
-    y_vals = [pos[node][1] for node in graph.nodes()]
-    z_vals = [pos[node][2] for node in graph.nodes()]
-    
-    node_colors = [degree_colors[degrees[node]] for node in graph.nodes()]
-    ax.scatter(x_vals,y_vals,z_vals, color =node_colors,s=100)
-
-    # Label the nodes 
-    for node, (x,y,z) in pos.items():
-        ax.text(x,y,z, f"{node}",size=12, zorder=1, color="k")
-
-    # Label the Degrees
-    legend_elements = [
-        plt.Line2D([0],[0], marker="o", color = "w", label="Degree 1",markeredgecolor="red"),
-        plt.Line2D([0],[0], marker="o", color = "w", label="Degree 2",markeredgecolor="green"),
-        plt.Line2D([0],[0], marker="o", color = "w", label="Degree 2",markeredgecolor="orange"),
-        plt.Line2D([0],[0], marker="o", color = "w", label="Degree 1",markeredgecolor="lightblue")
-    ]
-
-    ax.legend(handles=legend_elements)
-        
-
-    ax.set_xlabel("X axis")
-    ax.set_ylabel("Y axis")
-    ax.set_zlabel("Z axis")
-    
-    
-    plt.savefig("initial_molecular_graph.png",dpi=600)
-
 def degree_eval(graph):
     """ 
     Evaluates the degree and stores them to a dictionary and calculates the
@@ -196,6 +121,9 @@ def matrix_analysis(graph):
     Let G be an undirected graph, the multiplicity of k of the eigenvalue 0 of 
     the laplacian matrix equals the number of connected components
 
+    
+    Returns:
+        adj_matrix, lap_matrix, spectrum_lap, connected_components
     """
     adj_matrix = nx.adjacency_matrix(graph)
     lap_matrix = nx.laplacian_matrix(graph)
@@ -207,6 +135,8 @@ def matrix_analysis(graph):
     
     # Determine the connected components with the zero eigenvalues
     connected_components = np.count_nonzero(spectrum_lap==0)
+
+    return adj_matrix, lap_matrix, spectrum_lap, connected_components
 
     
 def dfs_path(G,start_node, path_length):
@@ -242,6 +172,149 @@ def find_all_paths_length_n(G,n):
         all_paths.extend(node_paths)
     return all_paths
 
+def spectral_bisection(graph):
+    """ 
+    This method uses the Fielder Vector to bisect the graph
+    
+    So the Fielder uses the second eigenvector of the Laplacian matrix and can be used to bisect a graph
+
+    The algorithm is as follows:
+
+        1. Compute Fielder Eigenvector
+        2. Search for median of v
+        for each node check if v[i] ≤ median
+            put node in partition V1
+        else
+            put node in partition V2
+
+    """
+    dissected_graph = nx.spectral_bisection(graph)
+    
+    list_of_subgraphs = []
+    for tup in dissected_graph:
+        list_of_subgraphs.append(graph.subgraph(tup))
+
+    return list_of_subgraphs
+
+def extract_submolecules(molecule, submolecule_list):
+    """ 
+    Extracts submolecules from the given molecule
+
+    Attributes:
+        molecule: list
+            a list of atoms
+        submolecule_list: list of list
+            a list of list with atom symbols
+    """
+    submolecules = []
+
+    for submol_symbols in submolecule_list:
+        submolecule = [atom for atom in molecule if atom.symbol in submol_symbols]
+        submolecules.append(submolecule)
+    return submolecules
+
+def draw_graphs(graphs, molecules, figname):
+    """
+    Uses Networkx to make side-by-side 3D Graphs of multiple molecules.
+    `graphs`: list of NetworkX graphs
+    `molecules`: list of molecules with corresponding atomic coordinates
+    """
+    fig = plt.figure(figsize=(len(graphs)*6, 6))  # Make the figure larger to accommodate multiple graphs
+
+    degree_colors = {1: "red", 2: "green", 3: "orange", 4: "lightblue"}
+
+    for idx, (graph, molecule) in enumerate(zip(graphs, molecules), 1):
+        ax = fig.add_subplot(1, len(graphs), idx, projection="3d")
+        
+        # Extract the positions out of the molecule
+        pos = {}
+        for atom in molecule:
+            pos[atom.symbol] = atom.coordinates
+        
+        # Draw the edges
+        for edge in graph.edges():
+            x_vals = [pos[edge[0]][0], pos[edge[1]][0]]
+            y_vals = [pos[edge[0]][1], pos[edge[1]][1]]
+            z_vals = [pos[edge[0]][2], pos[edge[1]][2]]
+            ax.plot(x_vals, y_vals, z_vals, color="black")
+        
+        # Draw the nodes
+        degrees = dict(graph.degree())
+        x_vals = [pos[node][0] for node in graph.nodes()]
+        y_vals = [pos[node][1] for node in graph.nodes()]
+        z_vals = [pos[node][2] for node in graph.nodes()]
+        node_colors = [degree_colors.get(degrees[node], "green") for node in graph.nodes()]
+        ax.scatter(x_vals, y_vals, z_vals, color=node_colors, s=100)
+        
+        # Label the nodes
+        for node, (x, y, z) in pos.items():
+            ax.text(x, y, z, f"{node}", size=12, zorder=1, color="k")
+        
+        # Set labels for axes
+        ax.set_xlabel("X axis")
+        ax.set_ylabel("Y axis")
+        ax.set_zlabel("Z axis")
+    
+    plt.tight_layout()
+    plt.savefig(f"{figname}.png", dpi=600)
+    
+    #Do show if you want nice animation
+    #plt.show()
+
+def asteroidal_triple(graph):
+    """ 
+    A asteroidal triple is a triple of vertices where two are joined by a path that avoids the neighbors of the third
+    """
+    print("Hello")
+
+def chain_decomposition(graph):
+    """ 
+    Peformes the chain decomposition algorithm
+
+    This https://doi.org/10.1016/j.ipl.2013.01.016 tells you all you ever wanted to know about it
+    """
+
+    chains = nx.chain_decomposition(graph)
+    
+
+def kerighan_lin_algorithm(graph):
+    """ 
+    Another heuristic algorithm to find partitions
+
+    TODO: This could also be useful but needs work
+
+    This algorithm minimized the number of crossing edges
+    """
+    print(nx.community.kernighan_lin_bisection(graph))
+
+
+def connectivity_analysis(graph):
+    """  
+    This function performes connectivity and cut algorithms on the given molecular graph
+    """
+
+    print(nx.junction_tree(graph))
+
+def general_nonlinear(graph,molecule,cov_bonds):
+    """
+    Set of Functions for Decius Selection
+    """
+    n_r = len(cov_bonds)
+    
+    # for n_phi calculate number of nodes with 1 bond
+    
+def el_symm_combinations(input_list):
+    # Sort
+    seen = set()
+    unique_combinations = []
+
+    for sublist in input_list:
+        sorted_tuple = (tuple(sorted(sublist)))
+        if sorted_tuple not in seen:
+            seen.add(sorted_tuple)
+            unique_combinations.append(sublist)
+    return unique_combinations
+
 def main():
     
     args = arguments.get_args()
@@ -265,23 +338,62 @@ def main():
     
 
     # Next of we make a small graph visualization function
-    draw_graph(G,molecule)
+    draw_graphs([G],[molecule], "initial_molecule_graph")
 
     # Degree Analysis, Calculate Average Parameters
     # Histogramm of degree population
     degree_dict, average_degree,average_degree_neighbour = degree_eval(G)
     
-    # Adjacency Matrix
+    
 
-    matrix_analysis(G)
+    # Matrix Analysis
+
+    _, _, lap_matrix, _ =matrix_analysis(G)
+
+
+    # Spectral Partitioning --> returns subgraphs
+
+    dis_subgraphs = spectral_bisection(G)
+
+    subgraphs_nodes = []
+    for graph in dis_subgraphs:
+        subgraphs_nodes.append(list(graph))
+    
+    # extract submolecules
+    submolecules = extract_submolecules(molecule, subgraphs_nodes)
+
+    # Make a picture of the result of spectral partitioning
+    draw_graphs(dis_subgraphs,submolecules, "spectral_bisection")
+
+    # IDOF Calculation
+
+    IDOF = len(molecule) * 3 - 6
+
+
+    # TODO i need to understand asteroidal structures in the graphs, seems useful
+    # Check for asteroidal graph
+    if not nx.is_at_free(G):
+        print("Hello")
+
+    connectivity_analysis(G)
+
+
+    
+
 
 
     # First simple algorithm is to find all possible paths
-
-    # TODO eliminate the symmetric tuples here
     
     paths_lenght_2 = find_all_paths_length_n(G,2)
+
+    paths_lenght_2 = el_symm_combinations(paths_lenght_2) 
+
     paths_length_3 = find_all_paths_length_n(G,3)
+
+    paths_length_3 = el_symm_combinations(paths_length_3)
+
+    print("Length angles:", len(paths_lenght_2))
+    print("Length dihedrals:", len(paths_length_3))
 
     
 
