@@ -2,7 +2,10 @@
 # first we take a method to read in XYZ files
 from modules import arguments
 from modules import ic_gen
+from modules import out
 import networkx as nx
+import math
+
 
 
 import numpy as np
@@ -315,6 +318,46 @@ def el_symm_combinations(input_list):
             unique_combinations.append(sublist)
     return unique_combinations
 
+def general_nonlinear(molecule,graph,cov_bonds):
+    """ 
+    Calculates the Decius Coordinates for the general nonlinear system
+    """
+
+    a = len(molecule)
+    b = len(cov_bonds)
+    IDOF = len(molecule) * 3 - 6
+
+
+    n_r = b # num of bonds
+
+    # filter vertices with degree 1
+    a_1 = len([node for node,degree in graph.degree() if degree==1])
+
+    n_phi = 4*b - 3*a + a_1
+    n_tau = b-a_1 
+
+    return n_r, n_phi, n_tau
+    
+
+def ic_generator(graph):
+    """ 
+    Calculates all the possible IC sets for a given graph
+    """
+
+    bonds = el_symm_combinations(find_all_paths_length_n(graph,1))
+    angles = el_symm_combinations(find_all_paths_length_n(graph,2))
+    dihedrals = el_symm_combinations(find_all_paths_length_n(graph,3))
+
+    return bonds,angles,dihedrals    
+
+def binomial_coefficient(n,k):
+    """ 
+    Calculates the Binomial Coefficient
+    """
+
+    return math.comb(n,k)
+
+    
 def main():
     
     args = arguments.get_args()
@@ -324,6 +367,13 @@ def main():
         # First of read in xyz file
 
         molecule = readxyz(args.xyz)
+
+    # Initialize out file
+
+    writer = out.Output_Writer("output.txt")
+  
+    #write header
+    writer.write_header(writer.header)
 
     # First of generate the degree of covalence
     degofc = ic_gen.degree_of_covalance(molecule)
@@ -365,9 +415,9 @@ def main():
     # Make a picture of the result of spectral partitioning
     draw_graphs(dis_subgraphs,submolecules, "spectral_bisection")
 
-    # IDOF Calculation
 
-    IDOF = len(molecule) * 3 - 6
+    
+
 
 
     # TODO i need to understand asteroidal structures in the graphs, seems useful
@@ -381,21 +431,32 @@ def main():
     
 
 
+    '''
+    Generate possible IC sets
+    '''
 
-    # First simple algorithm is to find all possible paths
+    bonds,angles,dihedrals = ic_generator(G)
+
+    '''
+    Calculate initial combinatorics
+    '''
     
-    paths_lenght_2 = find_all_paths_length_n(G,2)
+    IDOF = 3*len(molecule) -6
 
-    paths_lenght_2 = el_symm_combinations(paths_lenght_2) 
+    total_combinations = binomial_coefficient(len(bonds)+len(angles)+len(dihedrals),IDOF)
 
-    paths_length_3 = find_all_paths_length_n(G,3)
 
-    paths_length_3 = el_symm_combinations(paths_length_3)
-
-    print("Length angles:", len(paths_lenght_2))
-    print("Length dihedrals:", len(paths_length_3))
+    print(len(angles))
+    writer.write_subheader("== Total Combinations ICs ===")
+    writer.write_line(f"(IDOF, TOT_ICs) = {total_combinations}")
 
     
+
+     
+
+    # Decius Calculations
+    
+ 
 
 
     
