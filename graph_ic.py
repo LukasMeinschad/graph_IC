@@ -585,7 +585,25 @@ def main():
 
         idx += 1
 
-    print(sub_ic_dicts)
+    def combine_submolecule_ics(list_of_dicts):
+        """
+        Combines two submolecule ICs dicts taking into account all possible combinatoric cases
+        """
+        
+        
+        # basis case covered with the cartesian product
+        if len(list_of_dicts[0]) == 1 and len(list_of_dicts[1]) == 1:
+            combined = list_of_dicts[0]
+            for key in combined[0]:
+                combined[0][key].extend(list_of_dicts[1][0][key])
+
+    
+        return combined
+        
+        
+    
+    #combine_submolecule_ics(sub_ic_dicts)
+
     writer.write_subheader("=== Combinations after Spectral Bisection ===")
     combinations_sub_ics = math.prod(combinations_sub_ics)
     writer.write_line(f"Possible combinations submolecules: {combinations_sub_ics}")
@@ -620,12 +638,6 @@ def main():
 
     spectral_bisection_sets = combinations_sub_ics * bonds_choose_combs * angles_choose_combs * dihedrals_choose_combs
     writer.write_line(f"Spectral Bisection Total Sets: {spectral_bisection_sets}")
-
-
-
-        
-
-     
 
     # Decius Calculations
     
