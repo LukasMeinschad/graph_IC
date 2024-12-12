@@ -18,8 +18,12 @@ class Output_Writer:
     
     def write_data(self,data):
         with open(self.filename, "a") as file:
-            for line in data:
-                file.write(line + "\n")
+            if isinstance(data, list):
+                # convert each element to a string
+                data = [str(item) for item in data]
+                for line in data:
+                    file.write(line + "\n")
+
 
     def clear_file(self):
         """Clears the output of a current file"""

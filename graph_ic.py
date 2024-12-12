@@ -5,7 +5,7 @@ from modules import ic_gen
 from modules import out
 import networkx as nx
 import math
-
+import itertools
 
 
 import numpy as np
@@ -321,6 +321,14 @@ def el_symm_combinations(input_list):
 def general_nonlinear(molecule,graph,cov_bonds):
     """ 
     Calculates the Decius Coordinates for the general nonlinear system
+    
+    Attributes:
+        molecule:
+            a list of atoms
+        graph:
+            a networkx graph
+        cov_bonds:
+            a list of covalent bonds
     """
 
     a = len(molecule)
@@ -356,6 +364,8 @@ def binomial_coefficient(n,k):
     """
 
     return math.comb(n,k)
+
+
 
     
 def main():
@@ -411,15 +421,12 @@ def main():
     
     # extract submolecules
     submolecules = extract_submolecules(molecule, subgraphs_nodes)
-
-    # Make a picture of the result of spectral partitioning
-    draw_graphs(dis_subgraphs,submolecules, "spectral_bisection")
-
-
     
 
 
-
+    # Make a picture of the result of spectral partitioning
+    draw_graphs(dis_subgraphs,submolecules, "spectral_bisection")
+    
     # TODO i need to understand asteroidal structures in the graphs, seems useful
     # Check for asteroidal graph
     if not nx.is_at_free(G):
@@ -427,15 +434,20 @@ def main():
 
     connectivity_analysis(G)
 
-
-    
-
-
     '''
     Generate possible IC sets
     '''
 
     bonds,angles,dihedrals = ic_generator(G)
+
+    writer.write_subheader("=== ICs generated for Molecule ===")
+    writer.write_line("Bonds")
+    writer.write_data(bonds)
+    writer.write_line("Angles")
+    writer.write_data(angles)
+    writer.write_line("Dihedrals")
+    writer.write_data(dihedrals)
+   
 
     '''
     Calculate initial combinatorics
@@ -445,12 +457,173 @@ def main():
 
     total_combinations = binomial_coefficient(len(bonds)+len(angles)+len(dihedrals),IDOF)
 
-
-    print(len(angles))
-    writer.write_subheader("== Total Combinations ICs ===")
+      
+    writer.write_subheader("=== Total Combinations ICs ===")
     writer.write_line(f"(IDOF, TOT_ICs) = {total_combinations}")
 
+    '''
+    Apply Decius Rules to total molecule
+    '''
+
+    n_r, n_phi, n_tau = general_nonlinear(molecule,G,cov_bonds)
+
     
+    writer.write_subheader("=== IC Types needed (DECIUS) ===")
+    writer.write_line(f"Bonds needed: {n_r}")
+    writer.write_line(f"Angles needed: {n_phi}")
+    writer.write_line(f"Dihedrals needed: {n_tau}")
+
+    # Calculate the possible combinations 
+
+    bond_combs = binomial_coefficient(len(bonds), n_r)
+    angle_combs = binomial_coefficient(len(angles),n_phi)
+    dihedral_combs = binomial_coefficient(len(dihedrals),n_tau)
+
+    writer.write_line(f"Bond subsets: {bond_combs}")
+    writer.write_line(f"Angle subsets: {angle_combs}")
+    writer.write_line(f"Dihderal subsets: {dihedral_combs}")
+    writer.write_line("\n")
+
+    total_ic_sets = bond_combs * angle_combs * dihedral_combs
+
+    writer.write_line(f"Total combinations with Decius Rules: {total_ic_sets}")
+
+
+
+
+
+    '''
+    Apply Decius Rules to possible Subgraphs
+    '''    
+    idx = 1
+    combinations_sub_ics = []
+    sub_ic_dicts = []
+    fixed_bonds, fixed_angles, fixed_dihedrals = [], [], []
+    for subgraph, submolecule in zip(dis_subgraphs,submolecules):
+        bonds_sub, angles_sub, dihedrals_sub = ic_generator(subgraph)
+        fixed_bonds.extend(bonds_sub)
+        writer.write_subheader(f"=== Spectral Bisection analysis subgraph {idx} ===")
+        writer.write_line("Bonds")
+        writer.write_data(bonds_sub)
+        if len(angles_sub) != 0:
+            writer.write_line("Angles")
+            writer.write_data(angles_sub)
+            fixed_angles.extend(angles_sub)
+        if len(dihedrals_sub) != 0:
+            writer.write_line("Dihedrals")
+            writer.write_data(dihedrals_sub)
+            fixed_dihedrals.extend(dihedrals_sub)
+
+    
+        # Apply Decius Rules to Subgraphs
+        n_r_sub, n_phi_sub, n_tau_sub = general_nonlinear(submolecule,subgraph,bonds_sub)
+
+        writer.write_line("\n")
+        writer.write_line("Application of Decius Rules to Submolecules")
+        writer.write_line(f"Bond needed: {n_r_sub}")
+        writer.write_line(f"Angles needed: {n_phi_sub}")
+        writer.write_line(f"Dihedrals needed: {n_tau_sub}") 
+
+        '''
+        Build Submolecule IC sets as a Dictionary of Dictionareis
+        '''
+
+
+
+        
+        bond_combs_sub = binomial_coefficient(len(bonds_sub),n_r_sub)
+        if n_phi_sub > 0:
+            angle_combs_sub = binomial_coefficient(len(angles_sub),n_phi_sub)
+        else:
+            angle_combs_sub = 1
+        if n_tau_sub > 0: 
+            dihedral_combs_sub = binomial_coefficient(len(dihedrals_sub),n_tau_sub)
+        else:
+            dihedral_combs_sub = 1
+
+        writer.write_line(f"Bond subsets: {bond_combs_sub}")
+        writer.write_line(f"Angle subsets: {angle_combs_sub}")
+        writer.write_line(f"Dihedrals subsets: {dihedral_combs_sub}")
+
+        total_ics_sub = bond_combs_sub * angle_combs_sub * dihedral_combs_sub 
+        combinations_sub_ics.append(total_ics_sub)
+
+                
+        # Initialize the Nomodeco IC dict
+
+        ic_dict_temp = {
+            "bonds": [],
+            "angles": [],
+            "linear valence angles": [],
+            "out of plane angles": [],
+            "dihedrals": []
+        
+        }
+
+        # initialize an empty dictionary with the total combination
+
+        sub_ic_dict = {}
+
+
+        ic_count = 0
+        while ic_count < total_ics_sub:
+            sub_ic_dict.setdefault(ic_count,ic_dict_temp.copy())
+            ic_count +=1
+
+        # Base case the combinations are 1
+        if total_ics_sub == 1:
+            for key in sub_ic_dict:
+                sub_ic_dict[key]["bonds"].extend(bonds_sub)
+                sub_ic_dict[key]["angles"].extend(angles_sub)
+                sub_ic_dict[key]["dihedrals"].extend(dihedrals_sub)
+        sub_ic_dicts.append(sub_ic_dict)
+        
+
+
+        writer.write_line(f"Total combination with Decius Rules: {total_ics_sub}")      
+    
+
+        idx += 1
+
+    print(sub_ic_dicts)
+    writer.write_subheader("=== Combinations after Spectral Bisection ===")
+    combinations_sub_ics = math.prod(combinations_sub_ics)
+    writer.write_line(f"Possible combinations submolecules: {combinations_sub_ics}")
+    # do this with sets because of the ordering issues
+    fixed_bonds = [set(elem) for elem in fixed_bonds]
+    fixed_angles = [set(elem) for elem in fixed_angles]
+    fixed_dihedrals = [set(elem) for elem in fixed_dihedrals]
+    # Calculate differences in sets, then Combinatorics
+   
+    bonds_choose = []
+    for bond in bonds:
+        if set(bond) not in fixed_bonds:
+            bonds_choose.append(bond)
+    angles_choose = []
+    for angle in angles:
+        if set(angle) not in fixed_angles:
+            angles_choose.append(angle)
+    dihedrals_choose = []
+    for dihedral in dihedrals:
+        if set(dihedral) not in fixed_dihedrals:
+            dihedrals_choose.append(dihedral)
+
+    # now we can again use the decius quantities to just calculate our Binomial coefficients
+
+    bonds_choose_combs = binomial_coefficient(len(bonds_choose), (n_r - len(fixed_bonds)))
+    angles_choose_combs = binomial_coefficient(len(angles_choose), (n_phi - len(fixed_angles)))
+    dihedrals_choose_combs = binomial_coefficient(len(dihedrals_choose),(n_tau - len(fixed_dihedrals)))
+
+    writer.write_line(f"Bond subsets: {bonds_choose_combs}")
+    writer.write_line(f"Angle subsets: {angles_choose_combs}")
+    writer.write_line(f"Dihedral subsets: {dihedrals_choose_combs}")
+
+    spectral_bisection_sets = combinations_sub_ics * bonds_choose_combs * angles_choose_combs * dihedrals_choose_combs
+    writer.write_line(f"Spectral Bisection Total Sets: {spectral_bisection_sets}")
+
+
+
+        
 
      
 
