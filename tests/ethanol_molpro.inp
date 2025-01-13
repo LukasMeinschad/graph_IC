@@ -2,22 +2,24 @@ memory, 500, m ! Memory Requirements
 gthresh, optgrad=1.d-7,twoint=1.d-14,prefac=1.d-16 ! Guntram Rezept um numerischen Schmutz zu entfernen
 orient,mass
 geometry={
-S                 -2.99113802    0.31313510    0.00940497
-O                 -4.66051700    0.35680107   -0.00352105
-O                 -2.40229431    1.14346581   -1.31449609
-O                 -2.47528324   -1.27391594   -0.05433547
-O                 -2.42645751    1.02618947    1.40997250
-  H                 -2.60697363   -1.68782970    0.80177962
-  H                 -3.13441417    1.52669800    -1.82214793
-  }
+  H1,      1.8853,     -0.0401,      1.0854
+  C1,      1.2699,     -0.0477,      0.1772
+  H2,      1.5840,      0.8007,     -0.4449
+  H3,      1.5089,     -0.9636,     -0.3791
+  C2,     -0.2033,      0.0282,      0.5345
+  H4,     -0.4993,     -0.8287,      1.1714
+  H5,     -0.4235,      0.9513,      1.1064
+   O,     -0.9394,      0.0157,     -0.6674
+  H6,     -1.8540,      0.0626,     -0.4252
+}
    
-  mass, iso
-  basis=6-311g(d,p)
-   
-  {hf
-  start,atden}
-   
-  optg
-  {frequencies, symm=auto, print=0,analytical}
-  put,molden,h2so4.molden
+mass, iso
+basis=6-311g(d,p)
+ 
+{hf
+start,atden}
+ 
+optg
+{frequencies, symm=auto, print=0,analytical}
+put,molden,ethanol.molden
 

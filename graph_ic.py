@@ -3,6 +3,10 @@
 from modules import arguments
 from modules import ic_gen
 from modules import out
+from modules import graph_visualization
+from modules import graph_analysis
+
+
 import networkx as nx
 import math
 import itertools
@@ -69,77 +73,6 @@ def list_of_atom_symbols(molecule) -> list:
     for atom in molecule:
         symbol_list.append(atom.symbol)
     return symbol_list 
-
-def degree_eval(graph):
-    """ 
-    Evaluates the degree and stores them to a dictionary and calculates the
-    average degree of a graph
-
-    Attributes:
-        graph: A networkx graph
-    
-    Returns:
-        degree_dict: A dictionary with all degrees of the nodes
-        average_degree: The average degree of the graph
-        average_degree_neighbour:
-    """
-
-    degree_dict = {}
-
-    for node in graph.nodes():
-        degree_dict[f"{node}"] = graph.degree[node]
-    
-    average_degree_neighbour = nx.average_neighbor_degree(graph)
-
-    # Calculate the average degree
-
-    # Number of nodes
-    abs_V = graph.number_of_nodes()
-
-    sum_degree = 0
-    for node in graph.nodes():
-        sum_degree += graph.degree[node]
-    average_degree = sum_degree/abs_V
-
-    # Further we generate a histogramm of the degree population
-
-    degree_sequence = sorted((d for n, d in graph.degree()),reverse=True)
-    
-    plt.figure(figsize=(6,6))
-    plt.bar(*np.unique(degree_sequence, return_counts = True))
-    plt.title("Degree Histogramm")
-    plt.xlabel("Degree")
-    plt.ylabel("# of Nodes")
-    plt.savefig("degree_histogramm.png",dpi=600)
-
-    return degree_dict, average_degree, average_degree_neighbour
-
-def matrix_analysis(graph):
-    """ 
-    Makes adjecency, incidence and laplacian matrix 
-
-
-    Proposititon (because i will sure forget it):
-
-    Let G be an undirected graph, the multiplicity of k of the eigenvalue 0 of 
-    the laplacian matrix equals the number of connected components
-
-    
-    Returns:
-        adj_matrix, lap_matrix, spectrum_lap, connected_components
-    """
-    adj_matrix = nx.adjacency_matrix(graph)
-    lap_matrix = nx.laplacian_matrix(graph)
-    spectrum_lap = nx.laplacian_spectrum(graph)
-    
-    # Set values < 10⁻16 to zero
-
-    spectrum_lap[spectrum_lap < 10E-16] = 0
-    
-    # Determine the connected components with the zero eigenvalues
-    connected_components = np.count_nonzero(spectrum_lap==0)
-
-    return adj_matrix, lap_matrix, spectrum_lap, connected_components
 
     
 def dfs_path(G,start_node, path_length):
@@ -215,54 +148,6 @@ def extract_submolecules(molecule, submolecule_list):
         submolecule = [atom for atom in molecule if atom.symbol in submol_symbols]
         submolecules.append(submolecule)
     return submolecules
-
-def draw_graphs(graphs, molecules, figname):
-    """
-    Uses Networkx to make side-by-side 3D Graphs of multiple molecules.
-    `graphs`: list of NetworkX graphs
-    `molecules`: list of molecules with corresponding atomic coordinates
-    """
-    fig = plt.figure(figsize=(len(graphs)*6, 6))  # Make the figure larger to accommodate multiple graphs
-
-    degree_colors = {1: "red", 2: "green", 3: "orange", 4: "lightblue"}
-
-    for idx, (graph, molecule) in enumerate(zip(graphs, molecules), 1):
-        ax = fig.add_subplot(1, len(graphs), idx, projection="3d")
-        
-        # Extract the positions out of the molecule
-        pos = {}
-        for atom in molecule:
-            pos[atom.symbol] = atom.coordinates
-        
-        # Draw the edges
-        for edge in graph.edges():
-            x_vals = [pos[edge[0]][0], pos[edge[1]][0]]
-            y_vals = [pos[edge[0]][1], pos[edge[1]][1]]
-            z_vals = [pos[edge[0]][2], pos[edge[1]][2]]
-            ax.plot(x_vals, y_vals, z_vals, color="black")
-        
-        # Draw the nodes
-        degrees = dict(graph.degree())
-        x_vals = [pos[node][0] for node in graph.nodes()]
-        y_vals = [pos[node][1] for node in graph.nodes()]
-        z_vals = [pos[node][2] for node in graph.nodes()]
-        node_colors = [degree_colors.get(degrees[node], "green") for node in graph.nodes()]
-        ax.scatter(x_vals, y_vals, z_vals, color=node_colors, s=100)
-        
-        # Label the nodes
-        for node, (x, y, z) in pos.items():
-            ax.text(x, y, z, f"{node}", size=12, zorder=1, color="k")
-        
-        # Set labels for axes
-        ax.set_xlabel("X axis")
-        ax.set_ylabel("Y axis")
-        ax.set_zlabel("Z axis")
-    
-    plt.tight_layout()
-    plt.savefig(f"{figname}.png", dpi=600)
-    
-    #Do show if you want nice animation
-    #plt.show()
 
 def asteroidal_triple(graph):
     """ 
@@ -398,17 +283,18 @@ def main():
     
 
     # Next of we make a small graph visualization function
-    draw_graphs([G],[molecule], "initial_molecule_graph")
+    graph_visualization.draw_graphs([G],[molecule], "initial_molecule_graph")
 
-    # Degree Analysis, Calculate Average Parameters
-    # Histogramm of degree population
-    degree_dict, average_degree,average_degree_neighbour = degree_eval(G)
+    ## General Graph Analysis
+    degree_dict, average_degree,average_degree_neighbour = graph_analysis.degree_eval(G)
+    adj_matrix, lap_matrix, spectrum_lap, connected_components = graph_analysis.matrix_analysis(G)
+    dominating_set, dominating_set_graph= graph_analysis.dominating_set(G)
     
-    
+    dominating_set_atoms = extract_submolecules(molecule,dominating_set)
+    print(dominating_set,dominating_set_atoms)
+    graph_visualization.draw_graphs([dominating_set_graph],dominating_set_atoms, "dominating_set")
 
-    # Matrix Analysis
 
-    _, _, lap_matrix, _ =matrix_analysis(G)
 
 
     # Spectral Partitioning --> returns subgraphs
@@ -418,14 +304,15 @@ def main():
     subgraphs_nodes = []
     for graph in dis_subgraphs:
         subgraphs_nodes.append(list(graph))
-    
+
+ 
     # extract submolecules
     submolecules = extract_submolecules(molecule, subgraphs_nodes)
-    
+    print(submolecules)    
 
 
     # Make a picture of the result of spectral partitioning
-    draw_graphs(dis_subgraphs,submolecules, "spectral_bisection")
+    graph_visualization.draw_graphs(dis_subgraphs,submolecules, "spectral_bisection")
     
     # TODO i need to understand asteroidal structures in the graphs, seems useful
     # Check for asteroidal graph
@@ -439,6 +326,14 @@ def main():
     '''
 
     bonds,angles,dihedrals = ic_generator(G)
+
+    # TODO fix this
+
+    bonds = [tuple(elem) for elem in bonds]
+    angles= [tuple(elem) for elem in angles]
+    dihedrals = [tuple(elem) for elem in dihedrals]
+
+
 
     writer.write_subheader("=== ICs generated for Molecule ===")
     writer.write_line("Bonds")
@@ -499,8 +394,18 @@ def main():
     combinations_sub_ics = []
     sub_ic_dicts = []
     fixed_bonds, fixed_angles, fixed_dihedrals = [], [], []
+    n_r_fixed,n_phi_fixed,n_tau_fixed = [],[],[]
     for subgraph, submolecule in zip(dis_subgraphs,submolecules):
         bonds_sub, angles_sub, dihedrals_sub = ic_generator(subgraph)
+        
+
+        # TODO also fix this
+
+        bonds_sub = [tuple(elem) for elem in bonds_sub]
+        angles_sub = [tuple(elem) for elem in angles_sub]
+        dihedral_sub = [tuple(elem) for elem in dihedrals_sub]
+
+
         fixed_bonds.extend(bonds_sub)
         writer.write_subheader(f"=== Spectral Bisection analysis subgraph {idx} ===")
         writer.write_line("Bonds")
@@ -517,6 +422,9 @@ def main():
     
         # Apply Decius Rules to Subgraphs
         n_r_sub, n_phi_sub, n_tau_sub = general_nonlinear(submolecule,subgraph,bonds_sub)
+        n_r_fixed.append(n_r_sub)
+        n_phi_fixed.append(n_phi_sub)
+        n_tau_fixed.append(n_tau_sub)
 
         writer.write_line("\n")
         writer.write_line("Application of Decius Rules to Submolecules")
@@ -578,12 +486,42 @@ def main():
                 sub_ic_dict[key]["dihedrals"].extend(dihedrals_sub)
         sub_ic_dicts.append(sub_ic_dict)
         
-
+        # Then the case where the combinations are more then one
+        if total_ics_sub > 1:
+           # calculate the subsets as lists and then extend the lists
+           bond_subsets = list(itertools.combinations(bonds_sub,n_r_sub))
+           angle_subsets = list(itertools.combinations(angles_sub,n_phi_sub))
+           dihedral_subsets = list(itertools.combinations(dihedrals_sub,n_tau_sub))
+           
+           # if the length of the subsets is 1 we can directly extend the lists to all the dictionaries
+           if len(bond_subsets) == 1:
+               for key in sub_ic_dict:
+                   sub_ic_dict[key]["bonds"] = list(bond_subsets[0])
+           if len(angle_subsets) == 1:
+                for key in sub_ic_dict:
+                   sub_ic_dict[key]["angles"] = list(angle_subsets[0]) 
+           if len(dihedral_subsets) == 1:
+                for key in sub_ic_dict:
+                    sub_ic_dict[key]["dihedrals"] = list(dihedral_subsets[0])
+           # if the length of the subset is more then one we append it modulo the total length
+           if len(angle_subsets) > 1:
+                for key in sub_ic_dict:
+                     sub_ic_dict[key]["angles"] = list(angle_subsets[key % len(angle_subsets)])
+           
+           if len(dihedral_subsets) > 1:
+               for key in sub_ic_dict:
+                   sub_ic_dict[key]["dihedrals"] = list(dihedral_subsets[key % len(dihedral_subsets)]) # this zero here is a little bit confusing  
 
         writer.write_line(f"Total combination with Decius Rules: {total_ics_sub}")      
     
 
         idx += 1
+
+    # Calulate how much coordinates are fixed in total
+    n_r_fixed = sum(n_r_fixed)
+    n_phi_fixed = sum(n_phi_fixed)
+    n_tau_fixed = sum(n_tau_fixed)
+
 
     def combine_submolecule_ics(list_of_dicts):
         """
@@ -597,12 +535,38 @@ def main():
             for key in combined[0]:
                 combined[0][key].extend(list_of_dicts[1][0][key])
 
-    
+        # case one of the two dictionarys has length 1
+
+        elif len(list_of_dicts[0]) == 1 and len(list_of_dicts[1]) > 1:
+            # the total amount of combinations is given by the length of the second dictionary
+            combinations = len(list_of_dicts[1])
+            combined = list_of_dicts[1]
+            # now loop over this combined dictionary and extend each one with the first dictionary
+            for key in combined:
+                combined[key]["bonds"] = list_of_dicts[0][0]["bonds"] + combined[key]["bonds"]  
+                combined[key]["angles"] = list_of_dicts[0][0]["angles"] + combined[key]["angles"]
+                combined[key]["dihedrals"] = list_of_dicts[0][0]["dihedrals"] + combined[key]["dihedrals"]
+         
+        elif len(list_of_dicts[1]) > 1 and len(list_of_dicts[0]) == 1:
+            print("Hello")
+        elif len(list_of_dicts[0]) > 1   and len(list_of_dicts[1]) > 1:
+            # combinations are given by the multiplication of the lengths of the two dictionaries
+            combinations = len(list_of_dicts[0]) * len(list_of_dicts[1])
+            # make a copy of the first dictionary modulu the length of combinations
+            combined = {}
+            for i in range(combinations):
+                combined.setdefault(i,list_of_dicts[0][i % len(list_of_dicts[0])].copy())
+            # now append the second dictionary to the first modulu length of the total combinations
+            for i in range(combinations):
+                combined[i]["bonds"] = combined[i]["bonds"] + list_of_dicts[1][i % len(list_of_dicts[1])]["bonds"]
+                combined[i]["angles"] = combined[i]["angles"] + list_of_dicts[1][i % len(list_of_dicts[1])]["angles"]
+                combined[i]["dihedrals"] = combined[i]["dihedrals"] + list_of_dicts[1][i % len(list_of_dicts[1])]["dihedrals"]
         return combined
         
-        
     
-    #combine_submolecule_ics(sub_ic_dicts)
+    combined_set = combine_submolecule_ics(sub_ic_dicts)
+    
+
 
     writer.write_subheader("=== Combinations after Spectral Bisection ===")
     combinations_sub_ics = math.prod(combinations_sub_ics)
@@ -626,11 +590,48 @@ def main():
         if set(dihedral) not in fixed_dihedrals:
             dihedrals_choose.append(dihedral)
 
-    # now we can again use the decius quantities to just calculate our Binomial coefficients
+    # Now we write the function that builds all the possible combination
 
-    bonds_choose_combs = binomial_coefficient(len(bonds_choose), (n_r - len(fixed_bonds)))
-    angles_choose_combs = binomial_coefficient(len(angles_choose), (n_phi - len(fixed_angles)))
-    dihedrals_choose_combs = binomial_coefficient(len(dihedrals_choose),(n_tau - len(fixed_dihedrals)))
+    def distribute_elements(ic_set, elements, n_choose, key):
+        
+        print(f"Combinatoric Distribution of Elements for {key}")
+        print("=====================================")
+        print("Length of IC Set: ", len(ic_set))
+        print("Lenght of Elements: ", len(elements))
+        print("Number of Elements to Choose: ", n_choose)
+
+        # First we calculate the combinations
+        combs = binomial_coefficient(len(elements),n_choose)
+        # Now we calculate the total number of combinations
+        total_combinations = len(ic_set) * combs
+
+        # Make total_combinations number of copies of the ic_set
+        result = {}
+        for i in range(total_combinations):
+            result.setdefault(i,ic_set[i % len(ic_set)].copy())
+ 
+        
+        # Now using itertools generate a list of all possible combinations, then loop
+
+        comb_list = list(itertools.combinations(elements,n_choose))
+        for i in range(total_combinations):
+            result[i][key] = result[i][key] + list(comb_list[i % len(comb_list)])
+        
+        # Print the result
+        print("=====================================")
+        print(f"New IC_Dict has lenght: {len(result)}")
+
+        return result
+
+    
+    ic_dict = distribute_elements(combined_set,bonds_choose, (n_r-n_r_fixed),"bonds")
+    ic_dict = distribute_elements(ic_dict,angles_choose, (n_phi-n_phi_fixed),"angles")
+    ic_dict = distribute_elements(ic_dict,dihedrals_choose, (n_tau-n_tau_fixed),"dihedrals")
+
+
+    bonds_choose_combs = binomial_coefficient(len(bonds_choose), (n_r - n_r_fixed))
+    angles_choose_combs = binomial_coefficient(len(angles_choose), (n_phi - n_phi_fixed))
+    dihedrals_choose_combs = binomial_coefficient(len(dihedrals_choose),(n_tau - n_tau_fixed))
 
     writer.write_line(f"Bond subsets: {bonds_choose_combs}")
     writer.write_line(f"Angle subsets: {angles_choose_combs}")
@@ -639,9 +640,12 @@ def main():
     spectral_bisection_sets = combinations_sub_ics * bonds_choose_combs * angles_choose_combs * dihedrals_choose_combs
     writer.write_line(f"Spectral Bisection Total Sets: {spectral_bisection_sets}")
 
-    # Decius Calculations
-    
- 
+    # Write a seperate outpufile with the ic_dict
+    with open("ic_dict_output.txt", "w") as outfile:
+        for key, value in ic_dict.items():
+            outfile.write(f"{key}: {value}\n")
+
+
 
 
     
