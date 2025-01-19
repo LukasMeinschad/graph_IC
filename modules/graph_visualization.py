@@ -6,7 +6,7 @@
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np 
-
+from matplotlib.lines import Line2D
 
 
 def draw_graphs(graphs, molecules, figname):
@@ -26,6 +26,7 @@ def draw_graphs(graphs, molecules, figname):
         pos = {}
         for atom in molecule:
             pos[atom.symbol] = atom.coordinates
+        
         
         # Draw the edges
         for edge in graph.edges():
@@ -50,7 +51,14 @@ def draw_graphs(graphs, molecules, figname):
         ax.set_xlabel("X axis")
         ax.set_ylabel("Y axis")
         ax.set_zlabel("Z axis")
-    
+
+    # Create custom legend
+    legend_elements = [Line2D([0], [0], marker='o', color='w', label=f'Degree {deg}', 
+                              markerfacecolor=color, markersize=10) 
+                       for deg, color in degree_colors.items()]
+    fig.legend(handles=legend_elements, loc='upper right', title="Node Degree")
+
+
     plt.tight_layout()
     plt.savefig(f"{figname}.png", dpi=600)
     

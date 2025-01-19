@@ -5,6 +5,15 @@
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.cluster import KMeans
+from sklearn.cluster import DBSCAN
+from scipy.cluster.hierarchy import dendrogram, linkage
+
+
+# This is used for Kernighan_lin_Bisection
+from networkx.algorithms import community
+
 
 def matrix_analysis(graph):
     """ 
@@ -32,6 +41,12 @@ def matrix_analysis(graph):
     connected_components = np.count_nonzero(spectrum_lap==0)
 
     return adj_matrix, lap_matrix, spectrum_lap, connected_components
+
+def wiener_index(G):
+    """
+    Calculates the wiener_index for a given graph
+    """
+    return nx.wiener_index(G)
 
 def degree_eval(graph):
     """ 
@@ -93,5 +108,117 @@ def dominating_set(G):
     dominating_set = nx.dominating_set(G)
 
     subgraph = G.subgraph(dominating_set)
+    dominating_set = subgraph.nodes()
 
-    return list(dominating_set), subgraph
+    return dominating_set, subgraph
+
+def graph_reduction(G):
+    """ 
+    Function that removes all vertices with degree 0 or 1 from the graph.
+    This is a pruning step for fixing internal coordinates 
+    """
+
+    # Copy the graph to not alter original memory allocation
+    copy_graph = G.copy()
+    while True:
+        low_degree_nodes = [node for node in copy_graph.nodes() if G.degree(node) < 2]
+        if not low_degree_nodes:
+            break
+        copy_graph.remove_nodes_from(low_degree_nodes)
+    return copy_graph
+
+# Agglomerative Clustering
+
+def agglomerative_clustering(G,n_clusters=3):
+    """
+    Performs agglomerative clustering on the graph
+    Default Clusters are 2
+    """
+    # a adjacency matrix is needed for the clustering
+
+    adj_matrix = nx.to_numpy_array(G)
+
+    clustering = AgglomerativeClustering(n_clusters=n_clusters).fit(adj_matrix)
+    labels = clustering.fit_predict(1-adj_matrix)
+
+    # Compute the linkage matrix
+    Z = linkage(adj_matrix, 'ward')
+
+    # Plot the dendrogram
+    plt.figure(figsize=(10, 7))
+    dendrogram(Z,labels=list(G.nodes()))
+    plt.title("Dendrogram for Agglomerative Clustering")
+    plt.xlabel("Node Index")
+    plt.ylabel("Distance")
+    plt.savefig("dendrogram.png", dpi=600)
+    #plt.show()
+
+    # Print the Clustering
+    pos = nx.spring_layout(G)
+    plt.figure(figsize=(6,6))
+    nx.draw(G, pos, node_color=labels, with_labels=True)
+    plt.title("Agglomerative Clustering")
+    plt.savefig("agglomerative_clustering.png",dpi=600)
+
+    # maybe not the best approach we need connected graphs
+
+
+
+def k_means_clustering(G,n_clusters=2):
+    """
+    Performs k-means clustering on the graph
+    Default Clusters are 2
+    """
+
+    # a adjacency matrix is needed for the clustering
+
+    adj_matrix = nx.to_numpy_array(G)
+
+    clustering = KMeans(n_clusters=n_clusters).fit(adj_matrix)
+    labels = clustering.fit_predict(1-adj_matrix)
+
+    # Print the Clustering
+    pos = nx.spring_layout(G)
+    plt.figure(figsize=(6,6))
+    nx.draw(G, pos, node_color=labels, with_labels=True)
+    plt.title("K-Means Clustering")
+    plt.savefig("k_means_clustering.png",dpi=600)
+
+    # maybe not the best approach we need connected graphs
+
+
+def dbscan_clustering(G, eps=0.1, min_samples=2):
+    """
+    Performs DBSCAN clustering on a graph.
+
+    Args:
+        G (networkx.Graph): The input graph.
+        eps (float): The maximum distance between two samples for one to be considered as in the neighborhood of the other.
+        min_samples (int): The number of samples in a neighborhood for a point to be considered as a core point.
+
+    Returns:
+        labels (list): Cluster labels for each node.
+    """
+    # Convert the graph to an adjacency matrix
+    adjacency_matrix = nx.to_numpy_array(G)
+
+    # Perform DBSCAN clustering
+    dbscan = DBSCAN(eps=eps, min_samples=min_samples, metric='precomputed')
+    labels = dbscan.fit_predict(1 - adjacency_matrix)
+    pos = nx.spring_layout(G)
+    plt.figure(figsize=(8, 8))
+    nx.draw(G, pos, node_color=labels, with_labels=True, cmap=plt.cm.rainbow, node_size=500, font_size=10)
+    plt.title("DBSCAN Clustering of the Graph")
+    plt.savefig("dbscan_clustering.png", dpi=600)
+
+    
+    return labels
+
+
+def kerighan_lin_algorithm(G):
+    """ 
+    Input is undirected Graph G =(V,E) with vertex set V, edge set E
+
+    Graph is partitioned into two disjoint sets A, B
+    """
+    return community.kernighan_lin_bisection(G) 

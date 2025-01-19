@@ -5,3 +5,110 @@
 \____/_/ |_/_/  |_/_/   /_/ /_/     /___/\____/   
                                                   
 
+=== General Graph Analysis ===
+Chemical Formula: C2H6O
+Average Degree: 1.78
+Wiener Index: 82.0
+=== ICs generated for Molecule ===
+Bonds
+('H1', 'C1')
+('C1', 'H2')
+('C1', 'H3')
+('C1', 'C2')
+('C2', 'H4')
+('C2', 'H5')
+('C2', 'O')
+('O', 'H6')
+Angles
+('H1', 'C1', 'H2')
+('H1', 'C1', 'H3')
+('H1', 'C1', 'C2')
+('C1', 'C2', 'H4')
+('C1', 'C2', 'H5')
+('C1', 'C2', 'O')
+('H2', 'C1', 'H3')
+('H2', 'C1', 'C2')
+('H3', 'C1', 'C2')
+('C2', 'O', 'H6')
+('H4', 'C2', 'H5')
+('H4', 'C2', 'O')
+('H5', 'C2', 'O')
+Dihedrals
+('H1', 'C1', 'C2', 'H4')
+('H1', 'C1', 'C2', 'H5')
+('H1', 'C1', 'C2', 'O')
+('C1', 'C2', 'O', 'H6')
+('H2', 'C1', 'C2', 'H4')
+('H2', 'C1', 'C2', 'H5')
+('H2', 'C1', 'C2', 'O')
+('H3', 'C1', 'C2', 'H4')
+('H3', 'C1', 'C2', 'H5')
+('H3', 'C1', 'C2', 'O')
+('H4', 'C2', 'O', 'H6')
+('H5', 'C2', 'O', 'H6')
+=== Total Combinations ICs ===
+(IDOF, TOT_ICs) = 354817320
+=== IC Types needed (DECIUS) ===
+Bonds needed: 8
+Angles needed: 11
+Dihedrals needed: 2
+Bond subsets: 1
+Angle subsets: 78
+Dihderal subsets: 66
+
+
+Total combinations with Decius Rules: 5148
+=== Spectral Bisection analysis subgraph 1 ===
+Bonds
+('H3', 'C1')
+('H1', 'C1')
+('C1', 'H2')
+Angles
+('H3', 'C1', 'H1')
+('H3', 'C1', 'H2')
+('H1', 'C1', 'H2')
+
+
+Application of Decius Rules to Submolecules
+Bond needed: 3
+Angles needed: 3
+Dihedrals needed: 0
+Bond subsets: 1
+Angle subsets: 1
+Dihedrals subsets: 1
+Total combination with Decius Rules: 1
+=== Spectral Bisection analysis subgraph 2 ===
+Bonds
+('C2', 'H4')
+('C2', 'H5')
+('C2', 'O')
+('O', 'H6')
+Angles
+('C2', 'O', 'H6')
+('H4', 'C2', 'H5')
+('H4', 'C2', 'O')
+('H5', 'C2', 'O')
+Dihedrals
+['H4', 'C2', 'O', 'H6']
+['H5', 'C2', 'O', 'H6']
+
+
+Application of Decius Rules to Submolecules
+Bond needed: 4
+Angles needed: 4
+Dihedrals needed: 1
+Bond subsets: 1
+Angle subsets: 1
+Dihedrals subsets: 2
+Total combination with Decius Rules: 2
+=== Combinations after Spectral Bisection ===
+Possible combinations submolecules: 2
+Bond subsets: 1
+Angle subsets: 15
+Dihedral subsets: 10
+Spectral Bisection Total Sets: 300
+=== Graph Pruning Approach ===
+Bonds needed: 2
+Angles needed: 1
+Dihedrals needed: 0
+Total IC sets: 4356

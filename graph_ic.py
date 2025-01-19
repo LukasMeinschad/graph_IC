@@ -5,6 +5,8 @@ from modules import ic_gen
 from modules import out
 from modules import graph_visualization
 from modules import graph_analysis
+from modules import general_functions
+from modules import ic_distribution 
 
 
 import networkx as nx
@@ -165,15 +167,6 @@ def chain_decomposition(graph):
     chains = nx.chain_decomposition(graph)
     
 
-def kerighan_lin_algorithm(graph):
-    """ 
-    Another heuristic algorithm to find partitions
-
-    TODO: This could also be useful but needs work
-
-    This algorithm minimized the number of crossing edges
-    """
-    print(nx.community.kernighan_lin_bisection(graph))
 
 
 def connectivity_analysis(graph):
@@ -183,14 +176,8 @@ def connectivity_analysis(graph):
 
     print(nx.junction_tree(graph))
 
-def general_nonlinear(graph,molecule,cov_bonds):
-    """
-    Set of Functions for Decius Selection
-    """
-    n_r = len(cov_bonds)
-    
-    # for n_phi calculate number of nodes with 1 bond
-    
+
+ 
 def el_symm_combinations(input_list):
     # Sort
     seen = set()
@@ -285,30 +272,70 @@ def main():
     # Next of we make a small graph visualization function
     graph_visualization.draw_graphs([G],[molecule], "initial_molecule_graph")
 
-    ## General Graph Analysis
+    '''
+    General Graph Analysis
+    ''' 
+
+    chemical_formula = general_functions.chemical_formula(molecule)
+     
+
     degree_dict, average_degree,average_degree_neighbour = graph_analysis.degree_eval(G)
     adj_matrix, lap_matrix, spectrum_lap, connected_components = graph_analysis.matrix_analysis(G)
+    wiener_index = graph_analysis.wiener_index(G)
+
+
+
     dominating_set, dominating_set_graph= graph_analysis.dominating_set(G)
+
+    dominating_set_atoms = (extract_submolecules(molecule,dominating_set))
     
-    dominating_set_atoms = extract_submolecules(molecule,dominating_set)
-    print(dominating_set,dominating_set_atoms)
-    graph_visualization.draw_graphs([dominating_set_graph],dominating_set_atoms, "dominating_set")
+    # Weird Fix this some time
+    flattened_dominating_set_atoms = [atom for sublist in dominating_set_atoms for atom in sublist]
+
+    graph_visualization.draw_graphs([dominating_set_graph],[flattened_dominating_set_atoms], "dominating_set")
+
+    writer.write_subheader("=== General Graph Analysis ===")
+    writer.write_line("Chemical Formula: " + chemical_formula)
+    writer.write_line("Average Degree: " + f"{average_degree:.2f}")
+    writer.write_line("Wiener Index: " + f"{wiener_index}")
 
 
+    
+
+    
+    '''
+    Clustering Approaches
+    '''
+
+    # Agglomerative Clustering
+
+    
+    #graph_analysis.agglomerative_clustering(G)
+    #graph_analysis.k_means_clustering(G)
+    #graph_analysis.dbscan_clustering(G)
+
+    # Graph Pruning:
+    # Ref : Graphical Approach for Defining Natural Internal Coordinates
+    # Basically remove all nodes with degree 1 or zero
+    pruned_subgraph = graph_analysis.graph_reduction(G)
+    # now we need to extract the submolecules
+    pruned_submolecules = extract_submolecules(molecule,[list(pruned_subgraph)])
+    # flatten the submolecules
+    pruned_submolecules = [atom for sublist in pruned_submolecules for atom in sublist]
+    graph_visualization.draw_graphs([pruned_subgraph],[pruned_submolecules], "pruned_graph")
 
 
-    # Spectral Partitioning --> returns subgraphs
 
     dis_subgraphs = spectral_bisection(G)
 
+   
     subgraphs_nodes = []
     for graph in dis_subgraphs:
         subgraphs_nodes.append(list(graph))
 
- 
+    
     # extract submolecules
     submolecules = extract_submolecules(molecule, subgraphs_nodes)
-    print(submolecules)    
 
 
     # Make a picture of the result of spectral partitioning
@@ -332,9 +359,6 @@ def main():
     bonds = [tuple(elem) for elem in bonds]
     angles= [tuple(elem) for elem in angles]
     dihedrals = [tuple(elem) for elem in dihedrals]
-
-
-
     writer.write_subheader("=== ICs generated for Molecule ===")
     writer.write_line("Bonds")
     writer.write_data(bonds)
@@ -384,8 +408,8 @@ def main():
     writer.write_line(f"Total combinations with Decius Rules: {total_ic_sets}")
 
 
-
-
+        
+    
 
     '''
     Apply Decius Rules to possible Subgraphs
@@ -395,6 +419,8 @@ def main():
     sub_ic_dicts = []
     fixed_bonds, fixed_angles, fixed_dihedrals = [], [], []
     n_r_fixed,n_phi_fixed,n_tau_fixed = [],[],[]
+
+    print(ic_distribution.subgraph_ic_fixation(dis_subgraphs[0],submolecules[0]))
     for subgraph, submolecule in zip(dis_subgraphs,submolecules):
         bonds_sub, angles_sub, dihedrals_sub = ic_generator(subgraph)
         
@@ -419,7 +445,7 @@ def main():
             writer.write_data(dihedrals_sub)
             fixed_dihedrals.extend(dihedrals_sub)
 
-    
+       
         # Apply Decius Rules to Subgraphs
         n_r_sub, n_phi_sub, n_tau_sub = general_nonlinear(submolecule,subgraph,bonds_sub)
         n_r_fixed.append(n_r_sub)
@@ -589,6 +615,7 @@ def main():
     for dihedral in dihedrals:
         if set(dihedral) not in fixed_dihedrals:
             dihedrals_choose.append(dihedral)
+    
 
     # Now we write the function that builds all the possible combination
 
@@ -623,7 +650,6 @@ def main():
 
         return result
 
-    
     ic_dict = distribute_elements(combined_set,bonds_choose, (n_r-n_r_fixed),"bonds")
     ic_dict = distribute_elements(ic_dict,angles_choose, (n_phi-n_phi_fixed),"angles")
     ic_dict = distribute_elements(ic_dict,dihedrals_choose, (n_tau-n_tau_fixed),"dihedrals")
@@ -645,10 +671,89 @@ def main():
         for key, value in ic_dict.items():
             outfile.write(f"{key}: {value}\n")
 
-
-
-
     
+    '''
+    Graph Pruning approach
+
+    Take the pruned graph, fix all ICs for the pruned graph and append missing coordinates
+    '''
+    writer.write_subheader("=== Graph Pruning Approach ===")
+
+    # Remove this maybe later
+    print("=====================================")
+    print("Graph Pruning Approach")
+    print("=====================================")
+
+    # First of we need to generate the ICs for the pruned graph
+    pruned_bonds, pruned_angles, pruned_dihedrals = ic_generator(pruned_subgraph)
+    # calculate the Number of ICs needed (DECIUS)
+    n_r_pruned, n_phi_pruned, n_tau_pruned = general_nonlinear(pruned_submolecules,pruned_subgraph,pruned_bonds) 
+
+    # Initializte the IC dict for the pruned graph
+    ic_dict_pruned = {
+        "bonds": [],
+        "angles": [],
+        "linear valence angles": [],
+        "out of plane angles": [],
+        "dihedrals": []
+    }
+    # Make one initial entry in the big ic dict and then use the distribute elements function
+    ic_dict_pruned = {0: ic_dict_pruned}
+    ic_dict_pruned = distribute_elements(ic_dict_pruned,pruned_bonds, n_r_pruned,"bonds")
+    ic_dict_pruned = distribute_elements(ic_dict_pruned,pruned_angles,n_phi_pruned,"angles")
+    if n_tau_pruned > 0:
+        ic_dict_pruned = distribute_elements(ic_dict_pruned,pruned_dihedrals,n_tau_pruned,"dihedrals")
+    
+    # evaluate the fixed bonds
+    fixed_bonds_pruned = [set(elem) for elem in pruned_bonds]
+    fixed_angles_pruned = [set(elem) for elem in pruned_angles]
+    fixed_dihedrals_pruned = [set(elem) for elem in pruned_dihedrals]
+    
+    # now calculate the differences
+    bonds_choose_pruned = []
+    for bond in bonds:
+        if set(bond) not in fixed_bonds_pruned:
+            bonds_choose_pruned.append(bond)
+    angles_choose_pruned = []
+    for angle in angles:
+        if set(angle) not in fixed_angles_pruned:
+            angles_choose_pruned.append(angle)
+    dihedrals_choose_pruned = []
+    for dihedral in dihedrals:
+        if set(dihedral) not in fixed_dihedrals_pruned:
+            dihedrals_choose_pruned.append(dihedral)
+    
+    # Now again use our distribute elements function
+
+    ic_dict_pruned = distribute_elements(ic_dict_pruned,bonds_choose_pruned, (n_r - n_r_pruned),"bonds")
+    ic_dict_pruned = distribute_elements(ic_dict_pruned,angles_choose_pruned, (n_phi - n_phi_pruned),"angles")
+    if n_tau - n_tau_pruned > 0:
+        ic_dict_pruned = distribute_elements(ic_dict_pruned,dihedrals_choose_pruned, (n_tau - n_tau_pruned),"dihedrals")
+
+
+    # Write decius numbers to out
+
+    writer.write_line(f"Bonds needed: {n_r_pruned}")
+    writer.write_line(f"Angles needed: {n_phi_pruned}")
+    writer.write_line(f"Dihedrals needed: {n_tau_pruned}")
+
+    # Write the total number of combinations
+    writer.write_line(f"Total IC sets: {len(ic_dict_pruned)}")
+
+    # Write a seperate outpufile with the ic_dict
+    with open("ic_dict_output_pruned.txt", "w") as outfile:
+        for key, value in ic_dict_pruned.items():
+            outfile.write(f"{key}: {value}\n")
+
+    '''
+    Kerighan_Lin Algorithm
+    ''' 
+
+    kerighan_lin = graph_analysis.kerighan_lin_algorithm(G)
+     
+    # make into list of lists
+    kerighan_lin = [list(elem) for elem in kerighan_lin]
+    print(kerighan_lin)
 
 
 
